@@ -46,7 +46,7 @@ st.sidebar.markdown("### Dataset Summary")
 st.sidebar.write(f"📊 Total Rows: {original_data.shape[0]}")
 st.sidebar.write(f"🔢 Total Features: {X.shape[1]}")
 
-class_counts = original_data['Mental_State'].value_counts()
+class_counts = original_data['Menpttal_State'].value_counts()
 st.sidebar.markdown("### Class Distribution (Before SMOTE)")
 st.sidebar.dataframe(class_counts.reset_index().rename(columns={'index': 'Mental State', 'Mental_State': 'Count'}))
 
