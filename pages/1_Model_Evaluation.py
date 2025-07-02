@@ -55,6 +55,12 @@ df['Job_Role_Encoded'] = encoderJR.fit_transform(df['Job_Role'])
 df['Industry_Encoded'] = encoderIndustry.fit_transform(df['Industry'])
 df['Work_Location_Encoded'] = encoderWL.fit_transform(df['Work_Location'])
 
+df.dropna()
+
+for col in df.columns:
+    mode_value = df[col].mode()[0]
+    df[col] = df[col].fillna(mode_value)
+
 joblib.dump(encoderMS, "state_encoder.pkl")
 
 X = df[[
