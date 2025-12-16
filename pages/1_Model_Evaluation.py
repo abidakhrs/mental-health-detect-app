@@ -8,20 +8,17 @@ from sklearn.metrics import (
 )
 from sklearn.preprocessing import LabelEncoder
 import joblib
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import GradientBoostingClassifier
 
 st.set_page_config(page_title="Model Evaluation", layout="centered")
 st.title("📊 Burnout Prediction Model Evaluation")
 
 # Model selection
-model_option = st.selectbox("Select a model to evaluate:", ["Random Forest", "Logistic Regression"])
+model_option = st.selectbox("Select a model to evaluate:", ["Gradient Boosting", "Random Forest"])
 
 # Load encoder and data
 encoderMS = LabelEncoder()
-encoderGender = LabelEncoder()
-encoderJR = LabelEncoder()
-encoderIndustry = LabelEncoder()
 encoderWL = LabelEncoder()
 
 df = pd.read_csv("Impact_of_Remote_Work_on_Mental_Health.csv")
@@ -41,21 +38,21 @@ df['Satisfaction_with_Remote_Work_Ranked'] = df['Satisfaction_with_Remote_Work']
 df['Access_to_Mental_Health_Resources_Ranked'] = df['Access_to_Mental_Health_Resources'].map(Access_map)
 df['Physical_Activity'] = df['Physical_Activity'].fillna('No')
 df['Physical_Activity_Ranked'] = df['Physical_Activity'].map(physical_activity_map)
-df['Mental_Health_Condition'] = df['Mental_Health_Condition'].fillna('Good')
-df['Mental_State'] = df['Mental_Health_Condition'].replace({
-    'Burnout': 'Burnout',
-    'Anxiety': 'Burnout',
-    'Depression': 'Burnout',
-    'None': 'Good'
-})
+# Binary Target: Burnout (1) vs Others (0)
+df['Target'] = df['Mental_Health_Condition'].apply(lambda x: 1 if x == 'Burnout' else 0)
+y = df['Target']
+target_names = ['Not Burnout', 'Burnout']
 
-df['Mental_State_Encoded'] = encoderMS.fit_transform(df['Mental_State'])
-df['Gender_Encoded'] = encoderGender.fit_transform(df['Gender'])
-df['Job_Role_Encoded'] = encoderJR.fit_transform(df['Job_Role'])
-df['Industry_Encoded'] = encoderIndustry.fit_transform(df['Industry'])
 df['Work_Location_Encoded'] = encoderWL.fit_transform(df['Work_Location'])
-
-df.dropna()
+ 
+# Use features available in dataset
+feature_cols = [
+    'Age', 'Years_of_Experience', 'Hours_Worked_Per_Week', 'Number_of_Virtual_Meetings',
+    'Work_Life_Balance_Rating', 'Social_Isolation_Rating', 'Company_Support_for_Remote_Work',
+    'Sleep_Quality_Ranked', 'Stress_Level_Ranked', 'Productivity_Change_Ranked',
+    'Satisfaction_with_Remote_Work_Ranked', 'Access_to_Mental_Health_Resources_Ranked',
+    'Physical_Activity_Ranked', 'Work_Location_Encoded'
+]
 
 for col in df.columns:
     mode_value = df[col].mode()[0]
@@ -63,66 +60,63 @@ for col in df.columns:
 
 joblib.dump(encoderMS, "state_encoder.pkl")
 
-X = df[[
-    'Hours_Worked_Per_Week', 'Work_Life_Balance_Rating',
-    'Sleep_Quality_Ranked', 'Stress_Level_Ranked']]
-y = df['Mental_State_Encoded']
+X = df[feature_cols]
 
-# Logistic Regression Correlation Coefficient (Feature Selection)
-if model_option == "Logistic Regression":
-    st.subheader("📈 Feature Correlation (Logistic Regression)")
-    numeric_cols = ['Age', 'Years_of_Experience', 'Hours_Worked_Per_Week', 'Number_of_Virtual_Meetings',
-                    'Work_Life_Balance_Rating', 'Social_Isolation_Rating', 'Company_Support_for_Remote_Work',
-                    'Sleep_Quality_Ranked', 'Stress_Level_Ranked', 'Productivity_Change_Ranked', 'Satisfaction_with_Remote_Work_Ranked',
-                    'Access_to_Mental_Health_Resources_Ranked', 'Physical_Activity_Ranked', 'Gender_Encoded', 'Job_Role_Encoded',
-                    'Industry_Encoded', 'Work_Location_Encoded', 'Mental_State_Encoded']
+# Split Data to ensure realistic evaluation
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 
-    corr_matrix = df[numeric_cols].corr()
-    target_corr = corr_matrix['Mental_State_Encoded'].drop('Mental_State_Encoded')
+# Logistic Regression Correlation Coefficient (Feature Selection) - REMOVED or UPDATED
+# Since we removed Logistic Regression from the strict options, we can either keep it as separate analysis or remove.
+# For simplicity, let's remove the visual correlation block or adjust it to simple correlation matrix of features vs target.
 
-    st.subheader("🔢 Correlation Coefficient Table")
-    st.dataframe(target_corr.sort_values(ascending=False).rename("Correlation"))
+st.subheader("📈 Feature Correlation with Target")
+numeric_cols = feature_cols + ['Target']    
+corr_matrix = df[numeric_cols].corr()
+target_corr = corr_matrix['Target'].drop('Target')
 
-    st.subheader("📊 Correlation Bar Chart")
-    fig, ax = plt.subplots()
-    sns.barplot(x=target_corr.values, y=target_corr.index, ax=ax)
-    ax.set_title("Correlation with Mental_State_Encoded")
-    ax.set_xlabel("Correlation Coefficient")
-    st.pyplot(fig)
+st.subheader("🔢 Correlation Coefficient Table")
+st.dataframe(target_corr.sort_values(ascending=False).rename("Correlation"))
+
+st.subheader("📊 Correlation Bar Chart")
+fig, ax = plt.subplots()
+sns.barplot(x=target_corr.values, y=target_corr.index, ax=ax)
+ax.set_title("Correlation with Burnout Target")
+ax.set_xlabel("Correlation Coefficient")
+st.pyplot(fig)
 
 # Model Training
-if model_option == "Random Forest":
-    model = RandomForestClassifier(n_estimators=100, random_state=42)
-    model.fit(X, y)
-elif model_option == "Logistic Regression":
-    model = LogisticRegression(solver='lbfgs', max_iter=1000, class_weight='balanced')
-    model.fit(X, y)
+if model_option == "Gradient Boosting":
+    model = GradientBoostingClassifier(n_estimators=200, learning_rate=0.1, max_depth=3, random_state=42)
+    model.fit(X_train, y_train)
+elif model_option == "Random Forest":
+    model = RandomForestClassifier(n_estimators=100, random_state=42, class_weight='balanced')
+    model.fit(X_train, y_train)
 
-# Predict and Evaluate
-y_pred = model.predict(X)
+# Predict and Evaluate on Test Set
+y_pred = model.predict(X_test)
 
-accuracy = accuracy_score(y, y_pred)
-st.subheader("✅ Accuracy")
+accuracy = accuracy_score(y_test, y_pred)
+st.subheader("✅ Accuracy (Test Set)")
 st.metric(label="Model Accuracy", value=f"{accuracy:.2f}")
 
-mcc = matthews_corrcoef(y, y_pred)
+mcc = matthews_corrcoef(y_test, y_pred)
 st.subheader("📐 Matthews Correlation Coefficient")
 st.write(f"MCC Score: **{mcc:.2f}**")
 
-report_dict = classification_report(y, y_pred, target_names=encoderMS.classes_, output_dict=True)
+report_dict = classification_report(y_test, y_pred, target_names=target_names, output_dict=True)
 report_df = pd.DataFrame(report_dict).transpose()
 st.subheader("📄 Classification Report")
 st.dataframe(report_df)
 
 st.subheader("🔁 Confusion Matrix")
 fig_cm, ax_cm = plt.subplots()
-ConfusionMatrixDisplay.from_predictions(y, y_pred, display_labels=encoderMS.classes_, ax=ax_cm)
+ConfusionMatrixDisplay.from_predictions(y_test, y_pred, display_labels=target_names, ax=ax_cm)
 st.pyplot(fig_cm)
 
-if len(encoderMS.classes_) == 2:
-    y_proba = model.predict_proba(X)[:, 1]
-    fpr, tpr, _ = roc_curve(y, y_proba)
-    auc = roc_auc_score(y, y_proba)
+if len(target_names) == 2:
+    y_proba = model.predict_proba(X_test)[:, 1]
+    fpr, tpr, _ = roc_curve(y_test, y_proba)
+    auc = roc_auc_score(y_test, y_proba)
 
     st.subheader("📈 ROC Curve")
     fig_roc, ax_roc = plt.subplots()
@@ -147,15 +141,15 @@ if model_option == "Random Forest":
     st.pyplot(fig_imp)
     st.dataframe(importance_df.reset_index(drop=True))
 
-if model_option == "Logistic Regression":
-    st.subheader("📌 Feature Coefficients (Logistic Regression)")
-    coef = model.coef_[0]
-    coef_df = pd.DataFrame({"Feature": X.columns, "Coefficient": coef})
-    coef_df['Absolute'] = coef_df['Coefficient'].abs()
-    coef_df = coef_df.sort_values("Absolute", ascending=False)
+if model_option in ["Random Forest", "Gradient Boosting"]:
+    st.subheader(f"📌 Feature Importance ({model_option})")
+    importances = model.feature_importances_
+    features = X.columns
+    importance_df = pd.DataFrame({"Feature": features, "Importance": importances})
+    importance_df = importance_df.sort_values("Importance", ascending=False)
 
-    fig_coef, ax_coef = plt.subplots()
-    sns.barplot(x="Coefficient", y="Feature", data=coef_df, ax=ax_coef)
-    ax_coef.set_title("Logistic Regression Coefficients")
-    st.pyplot(fig_coef)
-    st.dataframe(coef_df.drop(columns="Absolute").reset_index(drop=True))
+    fig_imp, ax_imp = plt.subplots()
+    sns.barplot(x="Importance", y="Feature", data=importance_df, ax=ax_imp)
+    ax_imp.set_title(f"Feature Importance ({model_option})")
+    st.pyplot(fig_imp)
+    st.dataframe(importance_df.reset_index(drop=True))

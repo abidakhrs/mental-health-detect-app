@@ -16,17 +16,11 @@ st.markdown(f"**🔍 Model Used:** {algorithm_name}")
 
 # Load model and encoders
 model = joblib.load("burnout_model.pkl")
-encoderMS = joblib.load("state_encoder.pkl")  # for target variable
+# Binary mapping
+inverse_map = {0: "Low Risk of Burnout", 1: "High Risk of Burnout"}
 
-# Fit other encoders from dataset
-from sklearn.preprocessing import LabelEncoder
-encoderGender = LabelEncoder().fit(df['Gender'].dropna())
-encoderJR = LabelEncoder().fit(df['Job_Role'].dropna())
-encoderIndustry = LabelEncoder().fit(df['Industry'].dropna())
-encoderWL = LabelEncoder().fit(df['Work_Location'].dropna())
-
-# Inverse mapping
-inverse_map = {i: label for i, label in enumerate(encoderMS.classes_)}
+# Load encoders
+encoderWL = joblib.load("work_location_encoder.pkl")
 
 # Feature encoding maps
 sleep_quality_map = {'Poor': 1, 'Average': 2, 'Good': 3}
@@ -53,9 +47,6 @@ with st.form("user_input"):
     satisfaction = st.selectbox("Satisfaction with Remote Work", list(satisfaction_map.keys()))
     access = st.selectbox("Access to Mental Health Resources", list(Access_map.keys()))
     physical_activity = st.selectbox("Physical Activity", list(physical_activity_map.keys()))
-    gender = st.selectbox("Gender", encoderGender.classes_)
-    job_role = st.selectbox("Job Role", encoderJR.classes_)
-    industry = st.selectbox("Industry", encoderIndustry.classes_)
     work_location = st.selectbox("Work Location", encoderWL.classes_)
 
     submit = st.form_submit_button("🔎 Predict Mental State")
@@ -76,9 +67,6 @@ if submit:
     'Satisfaction_with_Remote_Work_Ranked': satisfaction_map[satisfaction],
     'Access_to_Mental_Health_Resources_Ranked': Access_map[access],
     'Physical_Activity_Ranked': physical_activity_map[physical_activity],
-    'Gender_Encoded': encoderGender.transform([gender])[0],
-    'Job_Role_Encoded': encoderJR.transform([job_role])[0],
-    'Industry_Encoded': encoderIndustry.transform([industry])[0],
     'Work_Location_Encoded': encoderWL.transform([work_location])[0]
     }
 
@@ -90,4 +78,8 @@ if submit:
 
 # Show prediction result
 if "prediction_label" in st.session_state:
-    st.success(f"🧠 The worker is predicted to be in: **{st.session_state.prediction_label}** mental state.")
+    if st.session_state.prediction_label == "High Risk of Burnout":
+        st.error(f"⚠️ Prediction: **{st.session_state.prediction_label}**")
+        st.markdown("It is recommended to take a break and seek support.")
+    else:
+        st.success(f"✅ Prediction: **{st.session_state.prediction_label}**")
