@@ -9,7 +9,7 @@ from sklearn.metrics import (
 from sklearn.preprocessing import LabelEncoder
 import joblib
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
 
 st.set_page_config(page_title="Model Evaluation", layout="centered")
 st.title("📊 Burnout Prediction Model Evaluation")
